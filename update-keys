@@ -11,18 +11,18 @@ GPG="gpg --quiet --batch --no-tty --no-permission-warning --keyserver "${KEYSERV
 pushd "$(dirname "$0")" >/dev/null
 
 $GPG --gen-key <<EOF
-%echo Generating Arch BSD Keyring keychain master key...
+%echo Generating Pac BSD Keyring keychain master key...
 Key-Type: RSA
 Key-Length: 1024
 Key-Usage: sign
-Name-Real: Arch BSD Keyring Keychain Master Key
-Name-Email: archbsd-keyring@localhost
+Name-Real: Pac BSD Keyring Keychain Master Key
+Name-Email: pacbsd-keyring@localhost
 Expire-Date: 0
 %commit
 %echo Done
 EOF
 
-rm -rf master packager archbsd-trusted
+rm -rf master packager pacbsd-trusted
 mkdir master packager
 
 while read -ra data; do
@@ -33,9 +33,9 @@ while read -ra data; do
 		${GPG} --command-fd 0 --edit-key ${keyid}
 	${GPG} --yes --lsign-key ${keyid} &>/dev/null
 	${GPG} --armor --output master/${username}.asc --export ${keyid}
-	echo "${keyid}:4:" >> archbsd-trusted
+	echo "${keyid}:4:" >> pacbsd-trusted
 done < master-keyids
-${GPG} --import-ownertrust < archbsd-trusted 2>/dev/null
+${GPG} --import-ownertrust < pacbsd-trusted 2>/dev/null
 
 while read -ra data; do
 	keyid="${data[0]}"
@@ -52,6 +52,6 @@ while read -ra data; do
 	fi
 done < packager-keyids
 
-cat master/*.asc packager/*.asc > archbsd.gpg
+cat master/*.asc packager/*.asc > pacbsd.gpg
 
 popd >/dev/null
