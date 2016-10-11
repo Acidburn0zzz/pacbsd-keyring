@@ -2,11 +2,12 @@
 
 export LANG=C
 
-TMPDIR=$(mktemp -d $RANDOM)
-trap "rm -rf '${TMPDIR}'" EXIT
+mkdir $(pwd)/keys
+TMPDIR=$(pwd)/keys
+#trap "rm -rf '${TMPDIR}'" EXIT
 
-KEYSERVER='hkp://pool.sks-keyservers.net'
-GPG="gpg --batch --no-tty --no-permission-warning --keyserver "${KEYSERVER}""
+KEYSERVER='hkp://keyserver.kjsl.com'
+GPG="gpg --batch --no-tty --no-permission-warning --keyserver "${KEYSERVER}" --homedir ${TMPDIR}"
 
 pushd "$(dirname "$0")" >/dev/null
 
@@ -23,8 +24,8 @@ Expire-Date: 0
 %echo Done
 EOF
 
-rm -rf master packager pacbsd-trusted
-mkdir master packager
+rm -rf master packager packager-revoked pacbsd-trusted pacbsd-revoked
+mkdir master packager packager-revoked
 
 while read -ra data; do
 	keyid="${data[0]}"
@@ -33,26 +34,28 @@ while read -ra data; do
 	printf 'minimize\nquit\ny\n' | \
 		${GPG} --command-fd 0 --edit-key ${keyid}
 	${GPG} --yes --lsign-key ${keyid} &>/dev/null
-	${GPG} --armor --output master/${username}.asc --export ${keyid}
+	${GPG} --armor --no-emit-version --export ${keyid} >> master/${username}.asc
 	echo "${keyid}:4:" >> pacbsd-trusted
 done < master-keyids
 ${GPG} --import-ownertrust < pacbsd-trusted 2>/dev/null
 
 while read -ra data; do
 	keyid="${data[0]}"
-	username="${data[@]:1}"
 	${GPG} --recv-keys ${keyid} &>/dev/null
+done < packager-keyids
+while read -ra data; do
+	keyid="${data[0]}"
+	username="${data[@]:1}"
 	printf 'clean\nquit\ny\n' | \
-		${GPG} --command-fd 0 --edit-key ${keyid}
-	FD=$(mktemp $RANDOM)
-	exec 4>"${FD}"
+		${GPG} --edit-key ${keyid}
 	if ! ${GPG} --list-keys --with-colons ${keyid} 2>/dev/null | grep -q '^pub:f:'; then
 		echo "key is not fully trusted: ${keyid} ${username}"
 	else
-		${GPG} --armor --output packager/${username}.asc --export ${keyid}
+		${GPG} --armor --no-emit-version --export ${keyid} >> packager/${username}.asc
 	fi
 done < packager-keyids
 
 cat master/*.asc packager/*.asc > pacbsd.gpg
 
 popd >/dev/null
+
