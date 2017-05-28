@@ -1,0 +1,5 @@
+keys/*
+master/*
+pacbsd-keyring-*
+pacbsd.gpg
+packager/*
