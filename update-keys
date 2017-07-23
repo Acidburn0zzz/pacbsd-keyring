@@ -6,7 +6,7 @@ mkdir $(pwd)/keys
 TMPDIR=$(pwd)/keys
 #trap "rm -rf '${TMPDIR}'" EXIT
 
-KEYSERVER='hkp://keyserver.kjsl.com'
+KEYSERVER='hkp://sks-keyservers.net:80'
 GPG="gpg --batch --no-tty --no-permission-warning --keyserver "${KEYSERVER}" --homedir ${TMPDIR}"
 
 pushd "$(dirname "$0")" >/dev/null
