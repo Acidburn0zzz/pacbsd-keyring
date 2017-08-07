@@ -1,20 +1,22 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
 export LANG=C
 
-mkdir $(pwd)/keys
-TMPDIR=$(pwd)/keys
-#trap "rm -rf '${TMPDIR}'" EXIT
+rm pacbsd.gpg
+rm -rf "$(pwd)/keys" && mkdir "$(pwd)/keys"
+TMPDIR="$(pwd)/keys"
 
-KEYSERVER='hkp://sks-keyservers.net:80'
-GPG="gpg --batch --no-tty --no-permission-warning --keyserver "${KEYSERVER}" --homedir ${TMPDIR}"
+#KEYSERVER='hkp://sks-keyservers.net:80'
+KEYSERVER='pool.sks-keyservers.net'
+GPG="gpg --batch --no-tty --no-permission-warning \
+  --keyserver ${KEYSERVER} --homedir ${TMPDIR}"
 
 pushd "$(dirname "$0")" >/dev/null
 
 $GPG --gen-key <<EOF
 %echo Generating Pac BSD Keyring keychain master key...
 Key-Type: RSA
-Key-Length: 1024
+Key-Length: 2048
 Key-Usage: sign
 Name-Real: Pac BSD Keyring Keychain Master Key
 Name-Email: pacbsd-keyring@localhost
@@ -28,34 +30,36 @@ rm -rf master packager packager-revoked pacbsd-trusted pacbsd-revoked
 mkdir master packager packager-revoked
 
 while read -ra data; do
-	keyid="${data[0]}"
-	username="${data[@]:1}"
-	${GPG} --recv-keys ${keyid} &>/dev/null
-	printf 'minimize\nquit\ny\n' | \
-		${GPG} --command-fd 0 --edit-key ${keyid}
-	${GPG} --yes --lsign-key ${keyid} &>/dev/null
-	${GPG} --armor --no-emit-version --export ${keyid} >> master/${username}.asc
-	echo "${keyid}:4:" >> pacbsd-trusted
+  keyid="${data[0]}"
+  username="${data[*]:1}"
+  echo 'Command: '${GPG}' --recv-keys '${keyid}
+  ${GPG} --recv-keys "${keyid}" &>/dev/null
+  printf 'minimize\nquit\ny\n' | \
+    ${GPG} --command-fd 0 --edit-key "${keyid}"
+  ${GPG} --yes --lsign-key "${keyid}" &>/dev/null
+  ${GPG} --armor --no-emit-version \
+    --export "${keyid}" >> master/"${username}.asc"
+  echo "${keyid}:4:" >> pacbsd-trusted
 done < master-keyids
 ${GPG} --import-ownertrust < pacbsd-trusted 2>/dev/null
 
 while read -ra data; do
-	keyid="${data[0]}"
-	${GPG} --recv-keys ${keyid} &>/dev/null
+  keyid="${data[0]}"
+  ${GPG} --recv-keys "${keyid}" &>/dev/null
 done < packager-keyids
+
 while read -ra data; do
-	keyid="${data[0]}"
-	username="${data[@]:1}"
-	printf 'clean\nquit\ny\n' | \
-		${GPG} --edit-key ${keyid}
-	if ! ${GPG} --list-keys --with-colons ${keyid} 2>/dev/null | grep -q '^pub:f:'; then
-		echo "key is not fully trusted: ${keyid} ${username}"
-	else
-		${GPG} --armor --no-emit-version --export ${keyid} >> packager/${username}.asc
-	fi
+  keyid="${data[0]}"
+  username="${data[*]:1}"
+  printf 'clean\nquit\ny\n' | \
+    ${GPG} --edit-key "${keyid}"
+  if ! ${GPG} --list-keys --with-colons "${keyid}" 2>/dev/null | grep -q '^pub:f:'; then
+    echo "key is not fully trusted: ${keyid} ${username}"
+  else
+    ${GPG} --armor --no-emit-version --export "${keyid}" >> packager/"${username}.asc"
+  fi
 done < packager-keyids
 
 cat master/*.asc packager/*.asc > pacbsd.gpg
 
 popd >/dev/null
-
